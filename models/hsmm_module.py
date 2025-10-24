@@ -40,12 +40,12 @@ def _hybrid_init(Y_np, K, seed=0, noise_scale=0.1):
     """
     from sklearn.cluster import KMeans
     
-    # 固定seedでKMeansを実行（再現性）
+
     km = KMeans(n_clusters=K, n_init=20, random_state=0, max_iter=500).fit(Y_np)
     base_centers = km.cluster_centers_
     labels = km.labels_
     
-    # seedに応じてノイズを追加（多様性）
+
     rng = np.random.RandomState(seed)
     data_scale = np.std(Y_np, axis=0).mean()
     noise = rng.randn(K, Y_np.shape[1]) * data_scale * noise_scale
@@ -59,13 +59,13 @@ def _robust_covariance(data, global_cov, min_samples=5):
     if len(data) < min_samples:
         return global_cov
     
-    # 中央値ベースの正規化で外れ値の影響を減らす
+
     median = np.median(data, axis=0)
     mad = np.median(np.abs(data - median), axis=0)
     mad = np.where(mad < 1e-6, 1.0, mad)
     normalized = (data - median) / mad
     
-    # 外れ値を除外（3-sigma rule）
+
     distances = np.sqrt(np.sum(normalized**2, axis=1))
     mask = distances < 3.0
     
@@ -103,17 +103,17 @@ class HSMM_LDS_Torch:
             self.A = A
         self.pi = torch.full((K,), 1.0/K, device=device)
 
-        # --- ハイブリッド初期化 ---
+
         if Y_init is not None:
             Y_np = Y_init.cpu().numpy()
             
-            # データのスケール情報
+
             data_std = np.std(Y_np, axis=0).mean()
             
-            # ハイブリッド初期化: KMeans + seed依存ノイズ
+
             centers, labels = _hybrid_init(Y_np, K, seed=seed, noise_scale=0.15)
             
-            # 診断情報
+
             cluster_counts = np.bincount(labels)
             print(f"[Init seed={seed}] Cluster sizes: {cluster_counts}")
             print(f"[Init seed={seed}] Cluster balance: min={cluster_counts.min()}, max={cluster_counts.max()}")
@@ -121,7 +121,7 @@ class HSMM_LDS_Torch:
             self.bk = torch.tensor(centers, device=device, dtype=dtype)
             self.Ak = torch.stack([torch.eye(obs_dim, device=device, dtype=dtype) for _ in range(K)])
             
-            # 各クラスタの共分散をロバストに推定
+
             global_cov = np.cov(Y_np.T) + 0.05 * np.eye(obs_dim) * (data_std ** 2)
             
             self.Sig = []
@@ -133,7 +133,7 @@ class HSMM_LDS_Torch:
                 else:
                     cov = global_cov
                 
-                # スケール正規化
+
                 scale_factor = np.trace(cov) / obs_dim
                 target_scale = data_std ** 2
                 cov = cov * (target_scale / (scale_factor + 1e-6))
